@@ -1,40 +1,25 @@
 // ==UserScript==
 // @name         B站课程信息提取器
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.0
 // @description  提取B站课程列表信息，用于学习计划
-// @author       You
+// @author       oneer
 // @match        https://www.bilibili.com/video/*
 // @grant        GM_setClipboard
-// @grant        GM_notification
-// @grant        unsafeWindow
-// @run-at       document-start
+// @run-at       document-end
 // ==/UserScript==
 
 (function() {
     'use strict';
-    
+
     console.log('[B站课程提取器] 脚本已加载');
-    
-    // 等待DOM加载完成
-    function waitForDOM() {
-        if (document.body) {
-            console.log('[B站课程提取器] DOM已就绪，初始化...');
-            initExtractor();
-        } else {
-            setTimeout(waitForDOM, 100);
-        }
-    }
-    
+    initExtractor();
+
     // 初始化提取器
     function initExtractor() {
-        // 创建按钮
         createExtractButton();
-        // 设置观察器监听DOM变化
         setupObserver();
     }
-    
-    waitForDOM();
 
     // 创建提取按钮
     function createExtractButton() {
@@ -45,8 +30,21 @@
 
         const button = document.createElement('button');
         button.id = 'extract-course-btn';
-        button.textContent = '📋 提取课程';
-        button.style.cssText = `
+        button.textContent = '📋 提取信息';
+
+        button.onmouseover = () => {
+            button.style.backgroundColor = '#0088aa';
+            button.style.transform = 'scale(1.05)';
+        };
+
+        button.onmouseout = () => {
+            button.style.backgroundColor = '#00a1d6';
+            button.style.transform = 'scale(1)';
+        };
+
+        button.onclick = extractCourses;
+
+        const inlineStyle = `
             padding: 6px 12px;
             background-color: #00a1d6;
             color: white;
@@ -63,90 +61,40 @@
             gap: 4px;
         `;
 
-        button.onmouseover = () => {
-            button.style.backgroundColor = '#0088aa';
-            button.style.transform = 'scale(1.05)';
-        };
-
-        button.onmouseout = () => {
-            button.style.backgroundColor = '#00a1d6';
-            button.style.transform = 'scale(1)';
-        };
-
-        button.onclick = extractCourses;
-
-        // 尝试找到自动连播按钮容器
-        const continuousBtn = document.querySelector('.auto-play .continuous-btn');
-        if (continuousBtn && continuousBtn.parentElement) {
-            const container = continuousBtn.parentElement;
-            container.insertBefore(button, continuousBtn);
-            console.log('✅ 按钮已添加到自动连播左侧');
-        } else {
-            // 备用方案：添加到播放器控制栏
-            const ctrlArea = document.querySelector('.bpx-player-control-bottom-center, .player-control-btn-group');
-            if (ctrlArea) {
-                ctrlArea.insertBefore(button, ctrlArea.firstChild);
-                console.log('✅ 按钮已添加到控制栏');
-            } else {
-                // 最后的备用方案：固定位置
-                button.style.cssText = `
-                    position: fixed;
-                    bottom: 80px;
-                    right: 20px;
-                    padding: 10px 15px;
-                    background-color: #00a1d6;
-                    color: white;
-                    border: none;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    font-size: 14px;
-                    z-index: 10000;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                    transition: all 0.3s ease;
-                    font-weight: 500;
-                    white-space: nowrap;
-                `;
-                document.body.appendChild(button);
-                console.log('✅ 按钮已添加到右下角（备用方案）');
-            }
-        }
-    }
-
-    // 备用：创建浮动按钮
-    function createFloatingButton() {
-        const button = document.createElement('button');
-        button.id = 'extract-course-btn';
-        button.textContent = '📋 提取课程';
-        button.style.cssText = `
+        const floatStyle = `
             position: fixed;
-            bottom: 100px;
+            bottom: 80px;
             right: 20px;
-            padding: 8px 12px;
+            padding: 10px 15px;
             background-color: #00a1d6;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 14px;
             z-index: 10000;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             transition: all 0.3s ease;
             font-weight: 500;
+            white-space: nowrap;
         `;
 
-        button.onmouseover = () => {
-            button.style.backgroundColor = '#0088aa';
-            button.style.transform = 'scale(1.05)';
-        };
+        function tryInsert() {
+            const autoPlay = document.querySelector('.auto-play');
+            if (autoPlay && autoPlay.parentElement) {
+                button.style.cssText = inlineStyle;
+                autoPlay.parentElement.insertBefore(button, autoPlay);
+                console.log('✅ 按钮已添加到自动连播左侧');
+                return true;
+            }
+            return false;
+        }
 
-        button.onmouseout = () => {
-            button.style.backgroundColor = '#00a1d6';
-            button.style.transform = 'scale(1)';
-        };
-
-        button.onclick = extractCourses;
-        document.body.appendChild(button);
-        console.log('✅ 浮动按钮已添加');
+        if (!tryInsert()) {
+            button.style.cssText = floatStyle;
+            document.body.appendChild(button);
+            console.log('✅ 提取按钮已添加到右下角');
+        }
     }
 
     // 提取课程信息
@@ -159,7 +107,6 @@
         items.forEach((item, index) => {
             const titleElement = item.querySelector('.title-txt');
             const durationElement = item.querySelector('.stat-item.duration');
-            const linkElement = item.querySelector('a[href]');
 
             if (titleElement && durationElement) {
                 const durationText = durationElement.textContent.trim();
@@ -167,8 +114,7 @@
                 courses.push({
                     序号: index + 1,
                     课程名称: titleElement.textContent.trim(),
-                    时长: durationText,
-                    地址: linkElement ? linkElement.href.trim() : ''
+                    时长: durationText
                 });
             }
         });
@@ -179,11 +125,12 @@
         }
 
         const totalDurationText = formatSecondsToTime(totalSeconds);
-        showExportDialog(courses, pageTitle, totalDurationText);
+        const pageUrl = window.location.href.split('?')[0];
+        showExportDialog(courses, pageTitle, totalDurationText, pageUrl);
     }
 
     // 显示导出对话框
-    function showExportDialog(courses, pageTitle, totalDurationText) {
+    function showExportDialog(courses, pageTitle, totalDurationText, pageUrl) {
         // 创建对话框
         const dialog = document.createElement('div');
         dialog.id = 'export-dialog';
@@ -219,14 +166,24 @@
         const title = document.createElement('h3');
         title.textContent = `课程信息已提取 (${courses.length} 条)`;
         title.style.marginTop = '0';
+        dialog.appendChild(title);
 
         if (pageTitle) {
             const subj = document.createElement('div');
             subj.textContent = `课程标题：${pageTitle}`;
-            subj.style.margin = '4px 0 8px';
+            subj.style.margin = '4px 0 4px';
             subj.style.fontSize = '13px';
             subj.style.color = '#333';
             dialog.appendChild(subj);
+        }
+
+        if (pageUrl) {
+            const urlLine = document.createElement('div');
+            urlLine.textContent = `网页地址：${pageUrl}`;
+            urlLine.style.margin = '0 0 8px';
+            urlLine.style.fontSize = '13px';
+            urlLine.style.color = '#333';
+            dialog.appendChild(urlLine);
         }
 
         const courseCount = courses.length;
@@ -245,29 +202,6 @@
         totalLine.style.color = '#333';
         dialog.appendChild(totalLine);
 
-        let includeUrls = false;
-        const optionContainer = document.createElement('div');
-        optionContainer.style.cssText = `
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 12px;
-            font-size: 13px;
-        `;
-        const urlCheckbox = document.createElement('input');
-        urlCheckbox.type = 'checkbox';
-        urlCheckbox.id = 'extract-url-checkbox';
-        const urlLabel = document.createElement('label');
-        urlLabel.htmlFor = 'extract-url-checkbox';
-        urlLabel.textContent = '包含课程地址';
-        urlCheckbox.onchange = () => {
-            includeUrls = urlCheckbox.checked;
-            preview.textContent = formatSimple(courses, pageTitle, totalDurationText, courseCount, includeUrls);
-        };
-        optionContainer.appendChild(urlCheckbox);
-        optionContainer.appendChild(urlLabel);
-        dialog.appendChild(optionContainer);
-
         // 格式选择按钮
         const buttonContainer = document.createElement('div');
         buttonContainer.style.cssText = `
@@ -278,11 +212,11 @@
         `;
 
         const formats = [
-            { name: '简洁文本', format: 'simple', func: () => formatSimple(courses, pageTitle, totalDurationText, courseCount, includeUrls) },
-            { name: '表格格式', format: 'table', func: () => formatTable(courses, pageTitle, totalDurationText, courseCount, includeUrls) },
-            { name: 'Markdown格式', format: 'markdown', func: () => formatMarkdown(courses, pageTitle, totalDurationText, courseCount, includeUrls) },
-            { name: 'JSON格式', format: 'json', func: () => formatJSON(courses, pageTitle, totalDurationText, courseCount, includeUrls) },
-            { name: 'CSV格式', format: 'csv', func: () => formatCSV(courses, pageTitle, totalDurationText, courseCount, includeUrls) }
+            { name: '简洁文本', format: 'simple', func: () => formatSimple(courses, pageTitle, totalDurationText, courseCount, pageUrl) },
+            { name: '表格格式', format: 'table', func: () => formatTable(courses, pageTitle, totalDurationText, courseCount, pageUrl) },
+            { name: 'Markdown格式', format: 'markdown', func: () => formatMarkdown(courses, pageTitle, totalDurationText, courseCount, pageUrl) },
+            { name: 'JSON格式', format: 'json', func: () => formatJSON(courses, pageTitle, totalDurationText, courseCount, pageUrl) },
+            { name: 'CSV格式', format: 'csv', func: () => formatCSV(courses, pageTitle, totalDurationText, courseCount, pageUrl) }
         ];
 
         formats.forEach(fmt => {
@@ -321,7 +255,7 @@
             white-space: pre-wrap;
             word-break: break-all;
         `;
-        preview.textContent = formatSimple(courses, pageTitle, totalDurationText, courseCount, false);
+        preview.textContent = formatSimple(courses, pageTitle, totalDurationText, courseCount, pageUrl);
 
         // 关闭按钮
         const closeBtn = document.createElement('button');
@@ -339,7 +273,6 @@
             overlay.remove();
         };
 
-        dialog.appendChild(title);
         dialog.appendChild(buttonContainer);
         dialog.appendChild(preview);
         dialog.appendChild(closeBtn);
@@ -349,113 +282,95 @@
     }
 
     // 简洁文本格式
-    function formatSimple(courses, pageTitle, totalDurationText, courseCount, includeUrl) {
+    function formatSimple(courses, pageTitle, totalDurationText, courseCount, pageUrl) {
         const lines = [];
         if (pageTitle) {
             lines.push(`课程标题：${pageTitle}`);
         }
+        if (pageUrl) {
+            lines.push(`网页地址：${pageUrl}`);
+        }
         lines.push(`课程总数：${courseCount}`);
         lines.push(`总时长：${totalDurationText}`);
         lines.push('');
-        lines.push(...courses.map((c, i) => {
-            const urlPart = includeUrl && c.地址 ? ` ${c.地址}` : '';
-            return `${i + 1}. ${c.课程名称} (${c.时长})${urlPart}`;
-        }));
+        lines.push(...courses.map((c, i) => `${i + 1}. ${c.课程名称} (${c.时长})`));
         return lines.join('\n');
     }
 
     // 表格格式
-    function formatTable(courses, pageTitle, totalDurationText, courseCount, includeUrl) {
+    function formatTable(courses, pageTitle, totalDurationText, courseCount, pageUrl) {
         let result = '';
         if (pageTitle) {
             result += `课程标题：${pageTitle}\n`;
         }
+        if (pageUrl) {
+            result += `网页地址：${pageUrl}\n`;
+        }
         result += `课程总数：${courseCount}\n`;
         result += `总时长：${totalDurationText}\n\n`;
-        result += '序号\t课程名称\t时长';
-        if (includeUrl) {
-            result += '\t地址';
-        }
-        result += '\n';
+        result += '序号\t课程名称\t时长\n';
         result += ''.padEnd(80, '-') + '\n';
         courses.forEach((c, i) => {
-            result += `${i + 1}\t${c.课程名称}\t${c.时长}`;
-            if (includeUrl) {
-                result += `\t${c.地址 || ''}`;
-            }
-            result += '\n';
+            result += `${i + 1}\t${c.课程名称}\t${c.时长}\n`;
         });
         return result;
     }
 
     // JSON格式
-    function formatJSON(courses, pageTitle, totalDurationText, courseCount, includeUrl) {
+    function formatJSON(courses, pageTitle, totalDurationText, courseCount, pageUrl) {
         const data = {
             title: pageTitle,
+            url: pageUrl,
             courseCount,
             totalDuration: totalDurationText,
-            courses: courses.map(c => {
-                const item = {
-                    序号: c.序号,
-                    课程名称: c.课程名称,
-                    时长: c.时长
-                };
-                if (includeUrl && c.地址) {
-                    item.地址 = c.地址;
-                }
-                return item;
-            })
+            courses: courses.map(c => ({
+                序号: c.序号,
+                课程名称: c.课程名称,
+                时长: c.时长
+            }))
         };
         return JSON.stringify(data, null, 2);
     }
 
     // Markdown格式
-    function formatMarkdown(courses, pageTitle, totalDurationText, courseCount, includeUrl) {
+    function formatMarkdown(courses, pageTitle, totalDurationText, courseCount, pageUrl) {
         const lines = [];
         if (pageTitle) {
             lines.push(`# ${pageTitle}`);
             lines.push('');
         }
+        if (pageUrl) {
+            lines.push(`**网页地址：** ${pageUrl}`);
+        }
         lines.push(`**课程总数：** ${courseCount}`);
         lines.push(`**总时长：** ${totalDurationText}`);
         lines.push('');
         const header = ['序号', '课程名称', '时长'];
-        if (includeUrl) {
-            header.push('地址');
-        }
         lines.push(`| ${header.join(' | ')} |`);
         lines.push(`| ${header.map(() => '----').join(' | ')} |`);
         courses.forEach((c, i) => {
             const name = c.课程名称.replace(/\|/g, '\\|');
             const duration = c.时长.replace(/\|/g, '\\|');
             const row = [`${i + 1}`, name, duration];
-            if (includeUrl) {
-                row.push(c.地址 ? c.地址.replace(/\|/g, '\\|') : '');
-            }
             lines.push(`| ${row.join(' | ')} |`);
         });
         return lines.join('\n');
     }
 
     // CSV格式
-    function formatCSV(courses, pageTitle, totalDurationText, courseCount, includeUrl) {
+    function formatCSV(courses, pageTitle, totalDurationText, courseCount, pageUrl) {
         let result = '';
         if (pageTitle) {
             result += `课程标题,${pageTitle.replace(/"/g, '""')}\n`;
         }
+        if (pageUrl) {
+            result += `网页地址,${pageUrl}\n`;
+        }
         result += `课程总数,${courseCount}\n`;
         result += `总时长,${totalDurationText}\n`;
-        result += '序号,课程名称,时长';
-        if (includeUrl) {
-            result += ',地址';
-        }
-        result += '\n';
+        result += '序号,课程名称,时长\n';
         courses.forEach((c, i) => {
-            result += `${i + 1},"${c.课程名称.replace(/"/g, '""')}","${c.时长.replace(/"/g, '""')}"`;
-            if (includeUrl) {
-                result += `,"${(c.地址 || '').replace(/"/g, '""')}"`;
-            }
-            result += '\n';
+            result += `${i + 1},"${c.课程名称.replace(/"/g, '""')}","${c.时长.replace(/"/g, '""')}"\n`;
         });
         return result;
     }
@@ -490,7 +405,6 @@
             GM_setClipboard(text);
             showNotification(`已复制 ${format} 格式到剪贴板！`, 'success');
         } catch (e) {
-            // 备用方案
             const textarea = document.createElement('textarea');
             textarea.value = text;
             document.body.appendChild(textarea);
@@ -550,12 +464,6 @@
     `;
     document.head.appendChild(style);
 
-    // 检查是否是B站视频页面
-    function isValidPage() {
-        const url = window.location.href;
-        return url.startsWith('https://www.bilibili.com/video');
-    }
-
     // 使用观察者模式持续监听DOM变化
     function setupObserver() {
         const observer = new MutationObserver(() => {
@@ -564,11 +472,9 @@
             }
         });
 
-        // 观察body的所有变化
         observer.observe(document.body, {
             childList: true,
-            subtree: true,
-            attributes: false
+            subtree: false
         });
 
         console.log('✅ DOM观察器已启动');
