@@ -159,6 +159,7 @@
         items.forEach((item, index) => {
             const titleElement = item.querySelector('.title-txt');
             const durationElement = item.querySelector('.stat-item.duration');
+            const linkElement = item.querySelector('a[href]');
 
             if (titleElement && durationElement) {
                 const durationText = durationElement.textContent.trim();
@@ -166,7 +167,8 @@
                 courses.push({
                     序号: index + 1,
                     课程名称: titleElement.textContent.trim(),
-                    时长: durationText
+                    时长: durationText,
+                    地址: linkElement ? linkElement.href.trim() : ''
                 });
             }
         });
