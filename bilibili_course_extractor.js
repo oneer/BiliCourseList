@@ -12,7 +12,6 @@
 (function() {
     'use strict';
 
-    console.log('[B站课程提取器] 脚本已加载');
     initExtractor();
 
     // 初始化提取器
@@ -84,7 +83,6 @@
             if (autoPlay && autoPlay.parentElement) {
                 button.style.cssText = inlineStyle;
                 autoPlay.parentElement.insertBefore(button, autoPlay);
-                console.log('✅ 按钮已添加到自动连播左侧');
                 return true;
             }
             return false;
@@ -93,7 +91,6 @@
         if (!tryInsert()) {
             button.style.cssText = floatStyle;
             document.body.appendChild(button);
-            console.log('✅ 提取按钮已添加到右下角');
         }
     }
 
@@ -476,8 +473,6 @@
             childList: true,
             subtree: false
         });
-
-        console.log('✅ DOM观察器已启动');
     }
 
 })();
